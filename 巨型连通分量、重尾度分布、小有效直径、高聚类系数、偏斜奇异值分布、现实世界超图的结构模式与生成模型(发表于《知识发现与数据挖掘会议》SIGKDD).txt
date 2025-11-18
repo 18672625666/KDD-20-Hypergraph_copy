@@ -1,0 +1,788 @@
+﻿            Structural Patterns and Generative Models of Real-world
+                                                     Hypergraphs
+             Manh Tuan Do                   Se-eun Yoon                  Bryan Hooi                   Kijung Shin∗
+                 KAIST EE                     KAIST EE             NUS School of Computing            KAIST AI & EE
+           manh.it97@kaist.ac.kr         granelle@kaist.ac.kr       bhooi@comp.nus.edu.sg           kijungs@kaist.ac.kr
+
+
+     ABSTRACT                                                                                          2 3 2 4
+                                                                             2
+     Graphs have been utilized as a powerful tool to model pairwise              3                                3 5
+                                                                                     5              1 4       3 4    5 6
+     relationships between people or objects. Such structure is a special   1    4      6
+     type of a broader concept referred to as hypergraph, in which each                                           4 5
+                                                                            7                     1 7  1 3 1 2
+     hyperedge may consist of an arbitrary number of nodes, rather than
+     just two. A large number of real-world datasets are of this form – Figure 1: A hypergraph and its 2-level decomposed graph.
+     for example, lists of recipients of emails sent from an organization, Such structures can be represented as hypergraphs [14, 16], which
+     users participating in a discussion thread or subject labels tagged in is a generalization of the usual notion of graphs. In hypergraphs,
+     an online question. However, due to complex representations and each node can be a person or an object. However, each hyperedge
+     lack of adequate tools, little attention has been paid to exploring acts as an interaction of an arbitrary number of nodes. For example,
+     the underlying patterns in these interactions.                 if each node represents an author, a hyperedge can be treated as a
+        In this work, we empirically study a number of real-world hyper- research paper which was published by a group of authors. A hyper-
+     graph datasets across various domains. In order to enable thorough edge also reveals the subset interactions among the elements of each
+     investigations, we introduce the multi-level decomposition method, subset, which this work pays special attention to. A subset interac-
+     which represents each hypergraph by a set of pairwise graphs. Each tion among nodes (e.g., {a,b}) is defined as their co-appearance as
+     pairwise graph, which we refer to as a k-level decomposed graph, a subset of a hyperedge (e.g., {a,b,c,d}). The freedom of number of
+     captures the interactions between pairs of subsets of k nodes. We nodes involved in each hyperedge and subset interactions naturally
+     empirically find that at each decomposition level, the investigated contribute to the complexity of hypergraphs.
+     hypergraphs obey five structural properties. These properties serve While pairwise graphs have been extensively studied in terms
+     as criteria for evaluating how realistic a hypergraph is, and establish of mining structures [15, 25, 38], discovering hidden characteris-
+     a foundation for the hypergraph generation problem. We also pro- tics [13, 23, 24, 28] as well as evolutionary patterns [31, 33, 41],
+     pose a hypergraph generator that is remarkably simple but capable little attention has been paid to defining and addressing analogous
+     of fulfilling these evaluation metrics, which are hardly achieved by problems in hypergraphs. Due to the complexity of subset interac-
+     other baseline generator models.                               tions, any single representation of hypergraphs relying on pairwise
+     ACM Reference Format:                                          links would suffer from information loss. Given  that most existing
+     Manh Tuan Do, Se-eun Yoon, Bryan Hooi, and Kijung Shin. 2020. Structural graph data structures only capture relationships between pairs of
+     Patterns and Generative Models of Real-world Hypergraphs. In Proceedings nodes, and more importantly, most patterns discovered are based on
+     of the 26th ACM SIGKDD Conference on Knowledge Discovery and Data pairwise links-based measurements, directly applying the existing
+     Mining (KDD ’20), August 23–27, 2020, Virtual Event, USA. ACM, New York, results in pairwise graphs to hypergraphs constitutes a challenge.
+     NY, USA, 11 pages. https://doi.org/10.1145/3394486.3403060
+                                                                       Here we investigate several hypergraph datasets among various
+     1   INTRODUCTION                                               domains [10, 45, 50]. We introduce the multi-level decomposition
+     In our digital age, interactions that involve a group of people or of hypergraphs, which captures relationships between subsets of
+     objects are ubiquitous [10–12]. These associations arise from vari- nodes. This offers a set of pairwise link representations convenient
+     ous domains, ranging from academic communities, online social  for analysis while guaranteeing to recover the original hypergraphs.
+
+arXiv:2006.07060v1  [cs.SI] 12 Jun 2020 networks to pharmaceutical practice. In particular, research papers In the most elementary type of decomposition, referred to as “node-
+     are often published by the collaborations of several coauthors, so- level decomposed graph” in this paper, two nodes are linked if they
+     cial networks involve group communications, and several related appear in at least one hyperedge together. This is the decomposition
+     medications may be applied as a treatment rather than just two. for k = 1. In the k-level decomposed graph, a node is defined as
+                                                                    a set of nodes in the original hypergraph, and two nodes are
+     ∗Corresponding author.                                                 k
+                                                                    connected if their union appears in a hyperedge (see Fig. 1).
+     Permission to make digital or hard copies of all or part of this work for personal or Using the multi-level decomposition, we find that the decom-
+     classroom use is granted without fee provided that copies are not made or distributed posed graphs of thirteen real-world hypergraphs generally obey
+     for profit or commercial advantage and that copies bear this notice and the full citation
+     on the first page. Copyrights for components of this work owned by others than ACM the following well-known properties of real-world graphs, across
+     must be honored. Abstracting with credit is permitted. To copy otherwise, or republish, different levels: (1) giant connected components, (2) heavy-tailed
+     to post on servers or to redistribute to lists, requires prior specific permission and/or a degree distributions, (3) small effective diameters, (4) high cluster-
+     fee. Request permissions from permissions@acm.org.
+     KDD ’20, August 23–27, 2020, Virtual Event, USA                ing coefficients, and (5) skewed singular-value distributions. This
+     © 2020 Association for Computing Machinery.                    decomposition also reveals how well such subset interactions are
+     ACM ISBN 978-1-4503-7998-4/20/08...$15.00                      connected, and this connectivity varies across different domains.
+     https://doi.org/10.1145/3394486.3403060
+KDD ’20, August 23–27, 2020, Virtual Event, USA                                                                    Do et al.
+
+                 Edge Level                            Triangle Level                           4clique Level
+       Real Data       HyperPA (Proposed)      Real Data       HyperPA (Proposed)      Real Data       HyperPA (Proposed)
+
+
+        NaivePA          SubsetSamplling        NaivePA          SubsetSampling         NaivePA          SubsetSampling
+
+
+Figure 2: Comparison of hypergraph generators with respect to degree distributions of decomposed graphs at different de-
+composition levels. The hypergraph generated by HyperPA   resembles the real data most. See Sect. 5.4 for numerical analysis.
+
+   What could be the possible underlying principles for such pat- 2 BACKGROUND AND RELATED WORK
+terns? Driven by this question, we propose a simple hypergraph Graph properties: Many empirical studies have been conducted
+generator model called HyperPA. By some proper modifications   to explore common properties of real-world pair-wise graphs based
+of preferential attachment [7, 9, 28], which account for degree as on predefined measurements [21]. There are two main types of these
+a group, nodes can “get rich” together while maintaining subset properties: static and dynamic. Static properties are revealed from a
+interactions. Compared to two other baseline models, HyperPA   snapshot of the graphs at a particular time, and they include degree
+shows more realistic results in reproducing the patterns discovered distribution [2, 24], diameter [3, 13], distribution of eigenvalues [23],
+in real-world hypergraphs and resembling the connectivity of such and more [5, 6, 13, 15, 18, 27, 28, 37, 44, 50]. Dynamic properties
+subset interactions (see Fig. 2).                              examine the evolution of a graph over a period of time. Real-world
+   Findings in common properties of real-world hypergraphs and graphs are found to possess an increasing average degree and a
+their underlying explanations can be significant for several rea- shrinking diameter [33]. Other dynamic properties include short
+sons: (1) anomaly detection: if some data significantly deviates from distances of spanning new edges [31], temporal locality in triangle
+the set of common patterns, it is reasonable to raise an alarm for formation [43], and temporal network motifs [35, 41].
+anomalies, (2) anonymization: by fully reproducing these patterns,
+organizations may synthesize datasets to avoid disclosing impor- Graph generative models: In conjunction, numerous graph gen-
+tant internal information. (3) simulation: generated hypergraphs erator models have been developed to produce synthetic graphs
+can be utilized for “what-if” simulation scenarios when collecting satisfying these commonly held patterns. Some of them focus on
+large-size hypergraph datasets is costly and difficult.        reproducing realistic degree distributions [9, 20, 36, 39]. Others
+   In short, the main contributions of our paper are three-fold. exploit locality to generate communities within the graph [28–
+                                                               30, 40, 47, 48]. In [4, 33], dynamic patterns of graph evolution are
+• Multi-level decomposition: a tool that facilitates easy and com-
+  prehensive analysis of subset interactions in hypergraphs.   recaptured. While most of these stochastic generator models rely
+                                                               on empirical results to demonstrate their abilities to repeat realistic
+• Patterns: five structural properties that are commonly held in
+  thirteen real-world hypergraphs from diverse domains.        behavior, [4, 32] provide theoretical guarantees. Although most of
+                                                               the aforementioned graph generators are self-contained stochastic
+• Hypergraph generator (HyperPA): a simple but powerful
+  model that produces hypergraphs satisfying the above properties. models, several models require some explicit fitting to real data in
+Reproducibility: We made the datasets, the code, and the full ex- order to exactly reproduce the patterns [22, 32, 42].
+perimental results available at https://github.com/manhtuando97/ Hypergraphs: Hypergraphs are used for representing various en-
+KDD-20-Hypergraph.                                             tities in diverse fields, including biology, medicine, social networks,
+   The remaining sections of this paper are outlined as follow: Sect. and web [4, 10, 11]. To better analyze and process hypergraphs,
+2 provides a brief survey of related work. In Sect. 3, we introduce our there has been an increasing interest in extending studies on graphs
+decomposition tool which facilitates our understanding of structural to hypergraphs, including spectral theory [28, 52] and triadic clo-
+properties of hypergraphs. Our empirical findings on real-world sure theory [10]. Studies have also proposed models of the gener-
+hypergraph datasets are presented in Sect. 4. Sect. 5 introduces hy- ation and evolution of hyperedges [10, 12, 17, 46]. However, [12]
+pergraph generators and demonstrates how these models perform  focuses on repeat patterns of hyperedges, particularly on the re-
+in terms of reproducing the real-world patterns. We discuss and cency bias and intensity of repeats, and generates only the next
+conclude our work in Sect. 6.                                  hyperedge, given all previous hyperedges. [10] focuses on a partic-
+                                                               ular type of hypergraph dynamics, namely simplicial closure. On
+Structural Patterns and Generative Models of Real-world Hypergraphs KDD ’20, August 23–27, 2020, Virtual Event,USA
+
+                                   6               2 3  2 4                 1 2     1 2
+                                                                             3      4
+    2    3                 2    3                              3 5
+                                                                                          3 4             1 2 
+                                   5            1 4        3 4      5 6
+        4     5            1    4                                                          5              3 4
+   1             6                                             4 5
+                                                                            1 3     2 3 
+   7                       7                  1 7  1 3  1 2                  4      4
+
+                      Node-level (or 1-level)  Edge-level (or 2-level)  Triangle-level (or 3-level) 4clique-level (or 4-level) 
+   Hypergraph G
+                     decomposed graph G( )    decomposed graph G( )      decomposed graph G( )   decomposed graph G( )
+Figure 3: Pictorial description of multi-level decomposition of a hypergraph G. Each k-level decomposed graph reveals inter-
+actions between subsets of k nodes.
+the other hand, [46] and [17] try to configure the generated hy- • Pairwise graph representation: decomposed graphs can be
+pergraphs to satisfy a given degree distribution without explicitly easily analyzed with existing measurements for pairwise graphs.
+accounting for subset interactions in exploring the patterns.  • No information loss: the original hypergraph can be recovered
+   In our work, we study the general patterns of real-world hy-  from the decomposed graphs (see Appendix C.1).
+pergraphs, encompassing the wide range of extensions studied in
+                                                               Notice that the notion of -level decomposition is a generaliza-
+graphs with a strong emphasis on ‘subset interactions’. On such                       k
+                                                               tion of an existing concept: when = 1, the decomposed graph
+basis, we propose and evaluate generative models for hypergraphs.                             k
+                                                               corresponds to the widely-used pairwise projected graph.
+3   MULTI-LEVEL DECOMPOSITION                                     In our study, we focus on k-level decomposed graphs with k ∈
+In this section, we introduce the multi-level decomposition, which {1, 2, 3, 4}, as most hyperedges in real-world hypergraphs are of
+is our method for analyzing hypergraphs. Our motivation for the sizes only up to 4. For simplicity, we call them node-level, edge-level,
+multi-level decomposition is that it is not straightforward to inves- triangle-level, and 4clique-level decomposed graphs, respectively.
+tigate the properties of hypergraphs in their raw form. We instead
+seek a way to analyze hypergraphs through the lens of ordinary 4   OBSERVATIONS
+graphs. By transforming hypergraphs into graphs, we can adopt  In this section, we demonstrate that the following structural pat-
+                                                                                                                      2,3
+the various properties studied in graphs for hypergraphs.      terns hold in each level of decomposed graphs of real hypergraphs :
+Hypergraphs and subset interactions: A hypergraph is defined   • P1. Giant connected component
+as G = (V , E), where V is a set of nodes and E ⊂ 2V is a set of • P2. Heavy-tailed degree distribution
+hyperedges. Each hyperedge e ⊆ V is a set of |e| nodes that have • P3. Small effective diameter
+appeared as a group. Distinguished from hyperedges, a subset inter- • P4. High clustering coefficient
+action among two or more nodes indicates their co-appearance as • P5. Skewed singular values
+a subset of a hyperedge. For example, a hyperedge    leads
+                                            {a,b,c,d}             These patterns, which are described in detail in the following
+to the following subset interactions:     ,      ,       ,
+                                 {a,b,c,d} {a,b,c} {b,c,d}     subsections, are supported by our observations in thirteen real hy-
+       ,       ,     ,     ,     ,    ,     , and     .
+{c,d, a} {d, a,b} {a,b} {a,c} {a,d} {b,c} {b,d}  {c,d}         pergraph datasets of medium to large sizes. Details on the datasets
+Multi-level decomposition: Given a hypergraph G = (V , E), the can be found in Appendix A, and the complete set of observations
+multi-level decomposition of G is defined as a set of k-level decom- is available in [1]. Below, we provide the intuition behind them and
+posed graphs for everyk ∈ {1, ..., maxe ∈E (|e|)}, where maxe ∈E (|e|)} present a random hypergraph model that we use as the null model.
+is the maximum size of a hyperedge in . The -level decomposed
+                                  E     k                      Intuition behind the patterns. Consider the coauthorship data
+graph, which is illustrated in Fig. 3, is defined below.
+                                                               as an example: in our node-level decomposed graph, each node
+Definition 1 (k-level decomposed graph). The k-level decom-    represents an author, and two nodes are connected if and only
+posed graph of a hypergraph =     is     =          where
+                         G   (V , E) G(k)  (V(k), E(k))        if these two authors have coauthored at least one paper before.
+                                                               Therefore, this node-level decomposition can be interpreted as
+        :=       2V :     =   and ∃     s.t.
+    V(k)  {v(k) ∈    |v(k)| k      e ∈ E   v(k) ⊆ e},          an author network. Such node-level decomposed graphs are not
+                       V                                     “real” graphs since they are obtained by decomposing the original
+        := {{       } ∈  (k) : ∃ ∈   s.t.   ∪     ⊆  }
+    E(k)    u(k),v(k)     2     e  E    u(k) v(k)  e .         hypergraphs. However, they represent pairwise relationships as
+                                                               real-world graphs do, and by this interpretation, we deduce that
+   The nodes in the -level decomposed graph of a hypergraph
+                 k                      G(k)                   the node-level decomposed graphs of real-world hypergraphs will
+G are the sets of k nodes in G that appear together in at least one exhibit the five patterns (i.e., P1-P5), which are well-known for real-
+hyperedge in  . In   , two sets of nodes are connected by an
+            G    G(k)           k                              world graphs [ 6, 13, 15, 24, 30, 32, 33, 37, 50]. We further suspect
+edge if and only if there exists a hyperedge in G that contains both. that these patterns also hold at higher levels of decomposition.
+That is, the -level decomposed graph naturally represents how
+           k                                                   2                                                (n)
+                                                         1      By our definition, a hyperedge of size n > k results in  n nodes and   k  edges in
+each set of k nodes interacts, as a group, with other sets of k nodes.                                k         2
+                                                               the k-level decomposed graph. For example, a hyperedge of 8 nodes is decomposed
+Utilizing decomposed graphs constitutes several advantages:         8           56
+                                                               into 3 = 56 nodes and 2 = 1, 540 edges in the triangle-level decomposed graph.
+  Subset interaction: decomposed graphs reveal subset interac- In order to avoid dominance by the edges resulted from large-size hyperedges, in the
+•                                                              node-level decomposed graphs, only hyperedges with up to 25 nodes are considered. In
+  tions between subsets of nodes.                              higher-level decomposition, we only consider hyperedges with up to 7 nodes. Actually,
+1Compared to projected graphs [51], which reveal only interactions between node in each dataset, the vast majority of hyperedges consist of 7 or fewer nodes.
+sets with overlaps, decomposed graphs reveal all interactions between node sets. 3We used Snap.py (http://snap.stanford.edu/snappy) for computing graph measures.
+KDD ’20, August 23–27, 2020, Virtual Event, USA                                                                    Do et al.
+Table 1: Size of the largest connected component, as the pro-  Table 2: Properties of node-level decomposed graphs of all
+portion of the total number of nodes (including the degree-    datasets. The diameter  and clustering coefficient are com-
+zero nodes), in each dataset at each decomposition level. The  pared against a null model. Average and standard deviation
+red numbers indicate that the graph no longer retains a gi-    of 10 random  hypergraphs are reported. All node-level de-
+ant connected component. In the case of   NDC-classes, the     composed graphs possess a diameter relatively small to the
+size of the second largest connected component at triangle     number of nodes. Almost all of them have clustering coeffi-
+and 4clique levels is 0.11 and 0.04. According to the descrip- cients significantly higher than that     of the null model.
+tion in Sect. 4.1, a giant connected component does not exist.
+                                                                 Dataset           # Nodes   Eff. diameter Clust.     coeff.
+   Level                 Node    Edge   Triangle 4clique                                    Real   Null.   Real   Null.
+                        ( = 1)  ( = 2)   ( = 3)  ( = 4)
+                         k       k       k        k              coauth-DBLP       1,924,991 6.8 6.7 ±9e−3 0.60 0.31 ±1e−4
+   coauth-DBLP           0.86    0.57 0.05 0.0006                coauth-Geology    1,256,385 7.1 6.8 ±8e−3 0.57 0.42 ±2e−4
+   coauth-Geology        0.72     0.5 0.06 0.0005                coauth-History    1,014,734 11.9 17 ±0.19 0.24 0.26 ±2e−4
+                                                                 DAWN                2,558  2.6  1.85 8e 5 0.64 0.30 9e 5
+   coauth-History        0.22 0.002 0.002 0.001                                                     ±  −           ±  −
+                                                                 email-Eu            998    2.8  1.85 ±7e−5 0.49 0.36 ±5e−4
+   DAWN                  0.89    0.98     0.91    0.52           NDC-classes         1,161  4.6  2.6 ±6e−3 0.61 0.32 ±2e−3
+   email-Eu              0.98    0.98     0.86    0.41           NDC-substances      5,311  3.5  2.5 ±9e−3 0.40 0.17 ±6e−4
+   NDC-classes           0.54    0.62 0.27 0.19                  tags-ask-ubuntu     3,029  2.4  1.9 ±2e−5 0.61 0.14 ±7e−5
+   NDC-substances        0.58    0.82     0.36 0.02              tags-math           1,629  2.1  1.8 ±1e−4 0.63 0.46 ±2e−4
+   tags-ask-ubuntu       0.99    0.99     0.79    0.21           tags-stack-overflow 49,998 2.7  1.9 ±2e−6 0.63 0.03 ±1e−6
+   tags-math             0.99    0.99     0.91    0.35           threads-ask-ubuntu 125,602 4.7  11.9 ±0.042 0.11 0.19 ±7e−4
+                                                                 threads-math       176,445 3.7  4.9 4e 3  0.32 0.12 1e 4
+   tags-stack-overflow   0.99    0.99     0.92    0.42                                              ±  −           ±  −
+                                                                 threads-stack-overflow 2,675,995 4.5 5.9 ±2e−3 0.18 0.12 ±2e−5
+   threads-ask-ubuntu    0.65 0.09 0.02 0.01
+   threads-math          0.86    0.61 0.03 0.0004              the proportion of hypergedges of sizes at most 3 is larger than 60%
+   threads-stack-overflow 0.86   0.32 0.004       3e−5         are shattered at this level. The others possess a giant connected
+                                                               component.
+Null Model: Random Hypergraphs (Null.):  In order to show P3
+and P4 are not random behavior of any hypergraph, we use a ran- 4.2  P2. Heavy-tailed degree distribution
+dom hypergraph corresponding to each real hypergraph as the    The degree of a node is defined as  the  number of its neighbors.
+null model. Specifically, given a hypergraph, the null model is con- This property means that the degree distribution is heavy-tailed, i.e
+structed by randomly choosing nodes to be contained in each hy- decaying at a slower rate than the exponential distribution (exp.).
+peredge, while keeping its original size.                      This can be partially explained by the “rich gets richer": high-degree
+                                                               nodes are more likely to form new links [40]. Besides visual inspec-
+4.1   P1. Giant connected component                            tion, we confirm this property by the following two tests:
+This property means that there is a connected component compris-
+                                                               • Lilliefors test [34] is applied at significance level 2.5% with the
+ing of a large proportion of nodes, and this proportion is signifi-
+                                                                 null hypothesis H0 that the given distribution follows exp.
+cantly larger (specifically, at least 70 times larger) than that of the • The likelihood method in [8, 19] is used on the given distribution
+second largest connected component. The majority of nodes in a
+                                                                 to compute the likelihood ratio r of a heavy-tailed distribution
+network are connected to each other [26]. This property serves as (power-law, truncated power-law or lognormal) against exp. If
+a basis for the other properties. For example, without a giant con-
+                                                                 r > 0, the given distribution is more similar to a heavy-tailed
+nected component (i.e, the graph is “shattered” into small connected distribution than exp.
+communities), diameter would clearly be small as a consequence,
+                                                                  In Fig. 4, we illustrate that for each dataset, at the decomposition
+not as an independent property of the dataset.
+                                                               level in which there is a giant connected component, the degree dis-
+   In Table 1, we report the size of the largest connected component
+                                                               tribution is heavy-tailed. Applying the two tests, in all cases, either
+at all decomposition levels. The connectivity of subset interactions,
+                                                                  is rejected or 0 (both claims hold in most cases), indicating
+represented as the highest level for which the decomposed graph H0            r >
+                                                               evidence for heavy-tailed degree distribution.4 The loglikelihood
+maintains a giant connected component, varies among datasets.
+                                                               ratios are reported in Table 3. Except for email-Eu at the node level,
+In particular, while the co-authorship datasets are shattered at the
+                                                               in all cases, at least one heavy-tailed distribution has a positive
+triangle level, the online-tags datasets retain giant connected com-
+                                                               ratio, implying that the degree distribution is more similar to that
+ponents until the 4clique level. Note that while our decomposition
+                                                               distribution than it is to exp.
+is only up to the 4clique level, there are many hyperedges of sizes
+at least 5, implying that when the graph is shattered, it consists of 4.3 P3. Small diameter
+several isolated cliques, not just isolated nodes.             Decomposed graphs are usually not completely connected, and it
+   There is a positive correlation between the distribution of hy- makes diameter subtle to define. We adopt the definition33 in[ ],
+peredge sizes and whether the graph is shattered at the edge-level where the effective diameter is the minimum distance d such that
+decomposition. Take the proportion of unique hyperedges of sizes approximately 90% of all connected pairs are reachable by a path of
+at most 2 as the feature. Datasets with this feature greater than 75% length at most d. This property means that the effective diameter
+are shattered, and the others retain giant connected components. At in real datasets is relatively small, and most connected pairs can be
+the triangle level, 6 (out of 13) datasets have giant connected com- 4
+                                                                In coauth-DBLP, at the edge level, H0 is accepted at 2.5% significance level, but the
+ponents. Except for email-Eu and NDC-classes, the datasets where loglikelihood ratios of the heavy-tailed distributions over exp. are greater than 5000.
+Structural Patterns and Generative Models of Real-world Hypergraphs KDD ’20, August 23–27, 2020, Virtual Event,USA
+
+ Levels             Degree Distributions of Decomposed Graphs               Singular-value Distributions of Decomposed Graphs
+    Node
+   Edge
+   Triangle
+   4clique
+
+
+Figure 4: Representative plots for the degree and singular-value distributions of decomposed graphs at 4 decomposition levels.
+They are heavy-tailed, and specifically  on  the log-log scale, tails often approximate a straight line.
+
+reachable by a small distance [48]. Note that the null model also the singular-value distributions are heavy-tailed. Specifically, as
+possesses this characteristic, and comparing real-world datasets seen in Table 3, except for tags-stack-overflow at the edge level, in
+and the corresponding null model in this aspect does not yield all cases, at least one heavy-tailed distribution has a positive ratio.
+consistent results. The effective diameters at the 4 decomposition Some representative plots for singular-value distributions of real
+levels are highlighted in Tables 2 and 4.                      datasets are provided in Fig. 4.
+                                                                  To support the patterns P1-P5, we could provide only some
+4.4   P4. High clustering coefficient                          representative results in Tables 2-4, and Fig. 4 due to the space limit.
+We make use of the clustering coefficient C [48], defined as the aver- The complete set of figures and numerical data can be found in[1].
+age of local clustering coefficients of all nodes. The local clustering
+coefficient  of each node is defined as:
+          Cv            v                                      5   HYPERGRAPH GENERATORS
+                  the number of triangles involving v
+    := 2 ×                                                     We have shown that five common properties of real-world pairwise
+ Cv       the number of connected triples of nodes involving .
+                                                       v       graphs are revealed at different levels of decomposition of real-
+This property means that the statistic in the real datasets is sig- world hypergraphs. In this section, we present HyperPA, our pro-
+nificantly larger than that   in the corresponding null models. As posed hypergraph generator model. By analyzing several statistics,
+communities result in a large number of triangles, this property we demonstrate that HyperPA can exhibit the known properties at
+implies the existence of many communities in the network.      several levels of decomposition. Compared to two baseline models,
+   In Table 2, clustering coefficients of the datasets are compared HyperPA demonstrates a better performance in terms of satisfying
+against that of the corresponding null model at the node-level the properties at all considered decomposition levels.
+decomposition. From the edge level, the decomposed graph of the
+null model is almost shattered into small isolated cliques. As a result,
+the clustering coefficient is unrealistically high, making it no longer 5.1 Intuition behind HyperPA
+valid to compare this statistic to that of the real-world data. Results The main idea behind our HyperPA is to take the subset interactions
+at the edge or higher-level decompositions are reported in Table 4. in decomposed graphs into consideration. Recall that the null-model
+                                                               without such consideration in Sect. 4 is shattered into isolated
+4.5   P5. Skewed singular values                               cliques without a giant connected component once it is decomposed
+This property means the singular-value distribution is usually into higher decomposition levels.
+heavy-tailed, and it is verified in the same manner as the pattern Intuitively, in order to reproduce the desired patterns in multi-
+P2. In all cases where a giant connected component is retained, level decomposed graphs, the generation process should have the
+either H0 is rejected or the log likelihood ratio r > 0, implying that following characteristics:
+KDD ’20, August 23–27, 2020, Virtual Event, USA                                                                    Do et al.
+
+Table 3:  Loglikehood ratio when fitting the degree and        Table 4: Numerical properties of edge or higher-level decom-
+singular-value distributions to each of three heavy-tailed     posed graphs of real-world datasets. As the decomposition
+distributions versus the exponential distribution. In most     level increases, fewer datasets retain giant connected com-
+cases, there exists at least one positive ratio, implying that ponents, and the properties of such datasets are reported in
+both distributions are heavy-tailed. Due to underflow prob-    the table. In them, small diameters and high clustering coef-
+lems, the results for truncated power-law are not available    ficients are observed.
+in some cases.
+                                                                  Measure               Nodes    Connect.  Eff. Clust.
+  Measure                 Degree           Singular values                                        Comp.   Diam.  Coeff.
+  Heavy-tail distribution pw trunpw lgnorm pw trunpw lgnorm       Edge-level decomposed graphs
+  Node-level decomposed graphs                                    coauth-DBLP          5,906,196   0.57    18.6  0.93
+  coauth-DBLP       1108   1108   1108  3.4    3.6   6.4          coauth-Geology       3,175,868   0.50    16.4  0.94
+  coauth-Geology    10.77  11.3   11.3  -2.3   -     11.3         DAWN                  72,288     0.98    3.9   0.72
+  coauth-History    429    430   429.9   -1   -0.07  0.3
+  DAWN              -4.9   -0.5   0.3   16.8  16.8    22          email-Eu              13,499     0.98    5.71  0.81
+  email-Eu          -15.3  -1.3   -1.1  -1.3  -0.14  0.4          NDC-classes            2,658     0.62    6.6   0.94
+  NDC-classes       2.17   18.9   14.3  1.2    1.3   1.3          NDC-substances        12,882    0.812    9.4   0.89
+  NDC-substances     -8    24.8   20.5  7.5    7.5   11.8         tags-ask-ubuntu       126,518    0.98    4.5   0.75
+  tags-ask-ubuntu   -1.4   6.1    4.9   9.5    9.5   9.5          tags-math             88,367     0.99    3.9   0.71
+  tags-math         -11.4  0.37   -1.1  9.9    9.9   9.9          tags-stack-overflow  4,083,464   0.99    3.9   0.78
+  tags-stack-overflow 202.8 245.1 241.8  6     6     6.1
+  threads-ask-ubuntu 2322  2330   2326  2.3    2.3   5.7          threads-math          782,102    0.61    7.4   0.94
+  threads-math     67574  67751  67725  6.6    6.6   11.4         threads-stack-overflow 15,108,684 0.32   12    0.97
+  threads-stack-overflow 2486 2549 2543 2.1    2.1   2.1          Triangle-level decomposed graphs
+  Edge-level decomposed graphs
+                                                                  DAWN                  257,416    0.91    5.3   0.87
+  coauth-DBLP       5616   5735   5718  1.3    1.3   4.5          email-Eu              24,993     0.86    10.3  0.89
+  coauth-Geology    122.1  123.3 123.4  122.1 123.3  123.4
+  DAWN              4025   4389   4303  0.5    0.6   0.5          NDC-substances        20,729     0.36    9.4   0.96
+  email-Eu          10.9   11.8   11.5  -1.3  -0.14  0.4          tags-ask-ubuntu       248,596    0.79    7.8   0.89
+  NDC-classes       44.9   44.9   44.9  1.2    1.3   1.3          tags-math             222,853    0.91    6.7   0.85
+  NDC-substances    10.9   21.8   19.4  10.9   -     0.3          tags-stack-overflow  10,725,751  0.92    6.5   0.88
+  tags-ask-ubuntu   36.1   41.3   39.7  -0.6  0.14   0.05
+  tags-math         20.4    24    23.6  -1.3  0.01   -0.1         4clique-level decomposed graphs
+  tags-stack-overflow 394268 395917 395852 -1.5 -    -0.15        DAWN                  284,755    0.52    8.1   0.89
+  threads-math      1524   1534   1528  0.44  0.44    3
+  threads-stack-overflow 4760 4785 4775 -2.6   -0.3  4.3          email-Eu              24,772     0.41    15.3  0.89
+                                                                  tags-ask-ubuntu       145,676    0.22    17.1  0.74
+  Triangle-level decomposed graphs                                tags-math             156,129    0.35    14.8  0.71
+  DAWN              1392   1426   1417  3.3    3.3   3.3          tags-stack-overflow  7,887,748   0.42    13    0.76
+  email-Eu          6.8    6.9    6.8   -1.2  -0.12  0.4
+  NDC-substances    0.6    0.6    0.6    -4    -0.5  12.6      5.2   Details of  HyperPA
+  tags-ask-ubuntu   378.6  383.2  381   -0.4  0.15   0.3
+  tags-math         96.4   100.8  99.3  -0.03 0.001  -0.001    We describe our proposed generator HyperPA, whose pseudocode
+  tags-stack-overflow 33198 33351 33319 -0.5   0.1   0.1       is provided in Algorithm 1. HyperPA repeatedly introduces a new
+  4clique-level decomposed graphs                              node to the hypergraph, and forms new hyperedges. When a node
+  DAWN              372.6  377.8 374.4  0.04   0.2   0.2       is added, HyperPA creates k new hyperedges where k is sampled
+  email-Eu           -2    0.15   -0.19 -0.8  -0.07  0.4       from a predetermined distribution . For each new hyperedge
+  tags-ask-ubuntu   21.5   21.5   25.9  -0.36 -0.04  0.54                                     NP
+  tags-math         107.5  107.5  112   -0.06  -     0.13      introduced by this new node, its size s is sampled from a prede-
+  tags-stack-overflow 31.6 31.6   31.6  31.6  31.6   31.6      termined distribution S. When choosing other nodes to fill in this
+                                                               new hyperedge, it takes into consideration all groups containing
+• For heavy-tailed degree distribution, “the rich should get richer”
+                                                                − 1 nodes. Among all such groups, the chance of being chosen for
+  [9]. However, in order to recapture such pattern at higher decom- s
+                                                               each group is proportional to its degree. The degree of each group
+  position levels, groups of nodes should “get rich” together rather
+                                                               is defined as  the  number of hyperedges containing that group.
+  than individually.
+                                                                  HyperPA uses 3 statistics: the number of nodes , the distribution
+  In order to lead to a high clustering coefficient, communities of                                      n
+•                                                              of hyperedge sizes and the distribution of the number of new
+  correlated nodes should form. As an analogy, in research publi-               S
+                                                               hyperedges per new node  . We obtain them from the real dataset
+  cations, authors tend to collaborate with those who are on the                     NP
+                                                               whose patterns HyperPA is trying to reproduce. Regarding , we
+  same field or affiliation, rather   than any authors.                                                           NP
+                                                               sort hyperedges according to timestamps, and reassign nodes into
+  However, several pairs of nodes among the communities should
+•                                                              new node ids based on this chronological order. We then learn NP
+  also be connected in order for the graph to have a giant connected
+                                                               by accounting, for each (new) node id , −     1, where
+  component and a small effective diameter.                                                      i HEi  HEi−         HEi
+                                                               is the number of hyperedges consisting of nodes with ids less than
+                                                               or equal to i.
+                                                                  In Algorithm 1, most of the times when s > 1, lines 12-13 are ex-
+                                                               ecuted (a proof is given in Appendix C.2), where HyperPA chooses
+Structural Patterns and Generative Models of Real-world Hypergraphs KDD ’20, August 23–27, 2020, Virtual Event,USA
+
+ Algorithm 1: HyperPA: Hypergraph generator based on Pref-     new hyperedge. However, as demonstrated in Table 6, the subset
+ erential Attachment (Proposed Model)                          interactions captured by Subset Sampling are often not connected
+                                                               well enough, making decomposed graphs easily shattered into iso-
+   Inputs :(1) distribution of hyperedge sizes S (with max size s¯),
+          (2) distribution of number of new hyperedges N P,    lated cliques without retaining a giant connected component.
+          (3) number of nodes n
+   Output:synthetic hypergraph G                               5.4   Empirical evaluation
+ 1 initialize G with ⌊s¯/2⌋ disjoint hyperedges of size 2, and compute the We empirically investigate the properties of generated hypergraphs
+    degree of all their subsets                                at four levels of decomposition. To facilitate comprehensive evalu-
+ 2 for   1 to do
+      i ←    n                                                 ation, we consider the following four datasets, which exhibit the
+ 3    sample a number k from N P.
+                                                               20 patterns most clearly (4 decomposed graphs × 5 patterns) to
+ 4    for ←  1 to do
+         j      k                                              test the three generators on: DAWN, email-Eu, tags-ask-ubuntu,
+ 5       sample a hyperedge size s from S
+                                                               and tags-math. The generators are evaluated on how well they can
+ 6       if s = 1 then
+                                                               reproduce the patterns in the real datasets.
+ 7           add the hyperedge {i } to G
+                                                                  We applied the proposed and baseline hypergraph generators
+ 8       else if all (s − 1)-sized groups have 0 degree then
+ 9           choose s − 1 nodes randomly                       to reproduce the real-world hypergraphs. For each considered real
+10           add the hyperedge of i and the s − 1 nodes to G   hypergraph, the distribution S of the sizes of hyperedges, the dis-
+                                                               tribution   of the number of new hyperedges per new node, and
+11       else                                                          NP
+                                                               the exact number  of nodes are directly learned. Note that ,
+12           choose a group of size (s − 1) with probability                   n                                   S NP
+              proportional to degree                           and n are the control variables exclusive to hypergraphs that are
+13           add the hyperedge of i and the s − 1 nodes to G   not directly relevant to how groups of nodes interact with each
+                                                               other, and thus they are out of the scope of this research.
+14    for each of the k newly formed hyperedges with i do         In this paper, we make use of these variables learned directly
+         increase the degree of all its subsets by 1
+15                                                             from the real hypergraphs. Thus, for each real dataset, there are 3
+                                                               corresponding synthetic datasets, generated by HyperPA, Subset
+a group of nodes based on its degree. As preferential attachment is Sampling and NaivePA using the statistics S, NP and n obtained
+conducted in a group-like manner, nodes “get rich” together, and from the real dataset. Generating hypergraphs without explicitly
+when decomposed, they form communities, leading to a high clus- accounting for these 3 variables is left as a topic for future research.
+tering coefficient. When a new node is introduced, it forms multiple We measure the statistics from the decomposed graphs of the
+hyperedges. Since these hyperedges involve nodes from different generated hypergraphs and calculate the scores for the 3 generators:
+communities, the introduction of a new node can potentially con-
+nect several communities, leading to a giant connected component • P1. Giant Conn. Comp.: if the decomposed graph at that level of
+and a small effective diameter.                                  the generated hypergraph retains a giant connected component
+   HyperPA  preserves subset interactions, in the sense that most (as described in Sect. 4.1), 1 point is given.
+of the times, all of the nodes chosen to fill in a new hyperedge • P2. Heavy-tailed Degree Dist.: the similarity between the gen-
+are those from the same previous hyperedge. In order to compare  erated degree distribution and the real distribution is measured by
+                                                                 the Kolmogorov-Smirnov D-statistic, defined as max ′
+against HyperPA, we examine two baseline models, NaivePA and                                                   x {∥F (x) −
+                                                                                 ′
+Subset Sampling, in the following subsections. They exhibit no or F(x)∥} where F, F are the cumulative degree distributions of the
+weak subset interactions, respectively.                          corresponding real and generated decomposed graphs. 1 point is
+                                                                 given to the generator having the D-statistic smaller than 0.2.
+5.3   Baseline models                                          • P3. Small Diameter: we want the generated effective diameter
+                                                                  ′
+                                                  We con-        d  to be close to the real value d. As the pattern P3. is ‘small
+5.3.1 Baseline preferential attachment for hypergraphs.                            ′
+sider a naive extension of preferential attachment to hypergraphs. effective diameter’, d should not be too large. At the same time,
+                                                                  ′
+In this model, when filling in each hyperedge of each new node, ex- d being too small may be the sign of the decomposed graph
+isting nodes are chosen independently with a chance proportional being shattered without a ‘giant connected component’. We adopt
+                                                                                                     2d 4d      ′
+to their individual degrees (instead of choosing groups of nodes a heuristic of the acceptance range as ( 3 , 3 ). If d is in the
+based on degrees of groups). We refer to this model as NaivePA. Its acceptance range, 1 point is given.
+pseudocode is provided in Appendix B.1.                        • P4. High Clustering Coeff.: as the pattern P4. is ‘high cluster-
+                                                                 ing coefficient’, it is desirable for the generated clustering coeffi-
+5.3.2 Subset Sampling. This model, namely Subset Sampling, is    cient c′ not to be too small compared to the real value c. However,
+inspired by Correlated Repeated Unions [12], which was introduced c′ being too large may imply that the graph is shattered into iso-
+to recapture temporal patterns in hyperedges. In Subset Sampling, lated cliques. As the clustering coefficient is bounded above by 1,
+                                                                                                            2c     4c
+when a new hyperedge is formed, previous hyperedges are sam-     we adopt a heuristic of the acceptance range as ( 3 , min( 3 , 1)).
+pled, and then with a certain probability, their elements are chosen If c′ is in the acceptance range, 1 point is given.
+independently to fill in the new hyperedge. The pseudocode and • P5. Skewed Singular Val.: similar to P2., the similarity between
+details of Subset Sampling can be found in Appendix B.2.         the singular-value distributions of the real and generated datasets
+   Subset Sampling preserves subset interactions to some degree, is measured by the Kolmogorov-Smirnov D-statistic. 1 point is
+as some nodes in the same previous hyperedge can co-appear in the given to the generator having the D-statistic smaller than 0.2.
+KDD ’20, August 23–27, 2020, Virtual Event, USA                                                                                       Do et al.
+Table 5: D-statistics between the distributions of real and               Table 6: Graph statistics of real and synthetic datasets at all
+synthetic datasets generated by the 3 models. We generated                4 decomposition levels. The scores for the generators are
+each dataset 5 times and report the average. 1 point is given             listed at the end. HyperPA     achieved the highest score.
+for each D-statistic smaller than    0 2 and the total scores are
+                                       .                                     Dataset         Level     Real   HyperPA     Naive    Subset
+computed at the end.     HyperPA    achieved the highest score.                                        Data   (Proposed)    PA    Sampling
+       Dataset         Level     HyperPA     Naive    Subset                 Connected component
+                                 (Proposed)    PA    Sampling
+                                                                             DAWN            Node      0.89      0.996     0.73     0.999
+       Degree distribution                                                                   Edge      0.98      0.98      0.95     0.95
+       DAWN            Node         0.153     0.184    0.132                                 Triangle  0.91      0.89 0.08 0.79
+                       Edge         0.135     0.082    0.059                                 4clique   0.52      0.81 0.01 0.22
+                       Triangle     0.117     0.077    0.203                 email-Eu        Node      0.98      0.995     0.997    0.988
+                       4clique      0.048     0.041    0.049                                 Edge      0.98      0.86      0.935     0.8
+       email-Eu        Node         0.392 0.282 0.235                                        Triangle  0.86      0.86      0.54      0.5
+                       Edge         0.109     0.148    0.126                                 4clique   0.41      0.76 0.03 0.04
+                       Triangle     0.159     0.19     0.178                 tags-ask-ubuntu Node      0.99      0.99      0.99     0.99
+                       4clique      0.128     0.149    0.141                                 Edge      0.98      0.92      0.98     0.95
+       tags-ask-ubuntu Node         0.065 0.259 0.128                                        Triangle  0.79      0.81      0.74     0.55
+                       Edge         0.082 0.232 0.057                                        4clique   0.21      0.39      0.11 0.002
+                       Triangle     0.069 0.428 0.049                        tags-math       Node      0.99      0.997     0.997    0.996
+                       4clique      0.087 0.655 0.029                                        Edge      0.99      0.98      0.993    0.97
+       tags-math       Node          0.2 0.364 0.249                                         Triangle  0.91      0.81      0.77     0.55
+                       Edge         0.101 0.216 0.073                                        4clique   0.35      0.28      0.12 0.02
+                       Triangle     0.072 0.365 0.117                        Diameter
+                       4clique      0.025 0.615 0.077
+                                                                             DAWN            Node       2.6       2        1.84      2
+       Singular-value distribution                                                           Edge       3.9       3.5 6.8 3.9
+       DAWN            Node          0.2      0.162    0.125                                 Triangle   5.3       3.9 11.2 5.9
+                       Edge         0.167 0.227 0.259                                        4clique    8.1       5.5       9.9     8.26
+                       Triangle     0.256 0.21 0.335                         email-Eu        Node       2.8      1.96      1.93     1.96
+                       4clique       263 0.37 0.433                                          Edge       5.7       3.4 4.4    4.8
+       email-Eu        Node         0.413 0.185   0.2                                        Triangle  10.3       3.9 6.4    6.9
+                       Edge         0.185 0.223 0.216                                        4clique   15.3       6.9 9.15 6.5
+                       Triangle     0.219 0.376 0.497                        tags-ask-ubuntu Node       2.4      1.95       1.9     1.95
+                       4clique      0.408 0.488 0.407                                        Edge       4.5       4.4       3.8      4.6
+       tags-ask-ubuntu Node         0.226 0.21 0.225                                         Triangle   7.8       7        5.77      8.2
+                       Edge         0.169 0.397 0.322                                        4clique   17.1      15.75 9.1 5.8
+                       Triangle     0.288 0.373 0.369                        tags-math       Node       2.1       1.9      1.88      1.9
+                       4clique      0.215 0.507 0.521                                        Edge       3.9       4.4      3.76      4.5
+       tags-math       Node         0.228 0.168 0.502                                        Triangle   6.7       8.2      5.75      7.5
+                       Edge         0.241 0.348 0.116                                        4clique   14.8      18.9 8.5 8
+                       Triangle     0.344 0.491 0.292                        Clustering coefficient
+                       4clique       0.3 0.51 0.369
+                                                                             DAWN            Node      0.64      0.82 0.37 0.78
+       Score                         19        10       17                                   Edge      0.72      0.76      0.82      0.7
+                                                                                             Triangle  0.87      0.77      0.96     0.86
+   Results of the generators are compared visually in Fig. 2 and                             4clique   0.89      0.85      0.62     0.73
+numerically in Tables 5 and 6. The total scores from the two tables          email-Eu        Node      0.49      0.81      0.73     0.63
+for HyperPA, NaivePA and Subset Sampling are 64, 49 and 57,                                  Edge      0.81      0.68      0.78     0.71
+respectively. Note that our proposed model,  HyperPA   achieved the                          Triangle  0.89       0.8      0.85     0.89
+                                                                                             4clique   0.89       0.9       0.6     0.66
+highest score. Without accounting for subset interactions, variables
+                                                                             tags-ask-ubuntu Node      0.61       0.6      0.72     0.62
+S, NP  and n are not sufficient to reproduce the patterns, as NaivePA
+and Subset Sampling fail to do so even when utilizing   ,    and   .                         Edge      0.75      0.71      0.76     0.74
+                                                       S NP       n                          Triangle  0.89      0.74       0.9     0.83
+6    CONCLUSIONS                                                                             4clique   0.74      0.69      0.67 0.34
+In summary, our contributions in this work are threefold.                    tags-math       Node      0.63      0.67      0.73     0.65
+                                                                                             Edge      0.71      0.68      0.69      0.7
+Multi-level decomposition:     First, we propose the multi-level de-                         Triangle  0.85      0.75       0.9     0.825
+composition as an effective      means of investigating hypergraphs.                         4clique   0.71      0.67      0.68 0.33
+The multi-level decomposition has several benefits: (1) it captures          Score                                45        39       40
+the group interactions within the hypergraph, (2) its graphical rep-
+resentation provides convenience in leveraging existing tools, and
+(3) it represents the original hypergraph without information loss.
+Structural Patterns and Generative Models of Real-world Hypergraphs KDD ’20, August 23–27, 2020, Virtual Event,USA
+
+Patterns in real hypergraphs:            Then, we present a set of common               [20]  Colin Cooper and Alan Frieze. 2003. A general model of web graphs. Random
+patterns held in    13 real-world hypergraphs. Specifically, we observe                       Struct. Algorithms 22, 3 (2003), 311–335.
+                                                                                        [21]  David Easley, Jon Kleinberg, et al. 2010. Networks, crowds, and markets. Vol. 8.
+the following structural properties consistently at different decom-                          Cambridge university press Cambridge.
+position levels (1)    giant connected components, (2)       heavy-tailed de-           [22]  Sergey Edunov, Dionysios Logothetis, Cheng Wang, Avery Ching, and
+gree distributions, (3)    small effective diameters, (4)     high clustering                 Maja Kabiljo. 2016. Darwini: Generating realistic large-scale social graphs.
+                                                                                              arXiv:1610.00664 (2016).
+coefficients, and (5)   skewed singular-value distributions. The connec-                [23]  Nicole Eikmeier and David F Gleich. 2017. Revisiting power-law distributions in
+tivity of subset interactions, however, varies among domains of                               spectra of real world networks. In KDD.
+                                                                                        [24]  Michalis Faloutsos, Petros Faloutsos, and Christos Faloutsos. 1999. On power-law
+datasets, illustrated by the level of decomposition that shatters the                         relationships of the internet topology. In ACM SIGCOMM computer communica-
+dataset into small connected components.                                                      tion review, Vol. 29. ACM, 251–262.
+                                                                                        [25]  M. Girvan and M. E. J. Newman. 2002. Community structure in social and
+Realistic hypergraph generator:             Lastly, we introduce     HyperPA,                 biological networks. Proc. Natl. Acad. Sci. U.S.A 99 (2002).
+a hypergraph generator that is simple but capable of reproducing                        [26]  U Kang, Mary McGlohon, Leman Akoglu, and Christos Faloutsos. 2010. Patterns
+                                                                                              on the Connected Components of TerabyteScale Graphs. In ICDM.
+the patterns of real-world hypergraphs across different decomposi-                      [27]  Jon M Kleinberg. 2002. Small-world phenomena and the dynamics of information.
+tion levels. By maintaining the connectivity of subset interactions                           In NIPS.
+of nodes in the hypergraphs,        HyperPA      shows better performance               [28]  Jon M Kleinberg, Ravi Kumar, Prabhakar Raghavan, Sridhar Rajagopalan, and
+                                                                                              Andrew S Tomkins. 1999. The web as a graph: measurements, models, and
+in reproducing the patterns than two other baseline models.                                   methods. In COCOON.
+Reproducibility:       We made the datasets, the code, and the full ex-                 [29]  Tamara G Kolda, Ali Pinar, Todd Plantenga, and Comandur Seshadhri. 2014. A
+                                                                                              scalable generative graph model with community structure. SIAM J. Sci. Comput
+perimental results available at https://github.com/manhtuando97/                              36, 5 (2014), C424–C452.
+KDD-20-Hypergraph.                                                                      [30]  R. Kumar, P. Raghavan, S. Rajagopalan, D. Sivakumar, A. Tomkins, and E. Uptal.
+                                                                                              2000. Stochastic models for the web graph. In FOCS.
+                                                                                        [31]  Jure Leskovec, Lars Backstrom, Ravi Kumar, and Andrew Tomkins. 2008. Micro-
+Acknowledgements                                                                              scopic evolution of social networks. In KDD.
+                                                                                        [32]  Jure Leskovec, Deepayan Chakrabarti, Jon Kleinberg, Christos Faloutsos, and
+This work was supported by National Research Foundation of Korea (NRF)                        Zoubin Ghahramani. 2010. Kronecker Graphs: An Approach to Modeling Net-
+grant funded by the Korea government (MSIT) (No. NRF-2020R1C1C1008296)                        works. J. Mach. Learn. Res 11 (2010), 985–1042.
+and Institute of Information & Communications Technology Planning &                     [33]  Jure Leskovec, Jon Kleinberg, and Christos Faloutsos. 2005. Graphs over time:
+                                                                                              densification laws, shrinking   diameters and possible explanations. In KDD.
+Evaluation (IITP) grant funded by the Korea government (MSIT) (No. 2019-                [34]  Hubert W Lilliefors. 1969. On the Kolmogorov-Smirnov test for the exponential
+0-00075, Artificial Intelligence Graduate School Program (KAIST)).                            distribution with mean unknown. J. Amer. Statist. Assoc. 64 (1969), 387–389.
+                                                                                        [35]  Paul Liu, Austin Benson, and Moses Charikar. 2019. A sampling framework for
+                                                                                              counting temporal motifs. In WSDM.
+                                                                                        [36]  Priya Mahadevan, Dmitri Krioukov, Kevin Fall, and Amin Vahdat. 2006. System-
+REFERENCES                                                                                    atic topology analysis and generation using degree correlations. In SIGCOMM.
+  [1] 2020. Supplementary results, code and datasets. Available online: https://github. [37]  Stanley Milgram. 1967. The small-world problem. Psychology Today 2, 1 (1967),
+      com/manhtuando97/KDD-20-Hypergraph.                                                     60–67.
+  [2] James Abello, Adam L Buchsbaum, and Jeffery R Westbrook. 1998. A functional       [38]  Ron Milo, Shai Shen-Orr, Shalev Itzkovitz, Nadav Kashtan, Dmitri Chklovskii,
+      approach to external graph algorithms. In ESA.                                          and Uri Alon. 2002. Network motifs: simple building blocks of complex networks.
+  [3] James Abello, Panos M Pardalos, and Mauricio GC Resende. 2013. Handbook of              Science 298, 5594 (2002), 824–827.
+      massive data sets. Vol. 4. Springer.                                              [39]  Michael Mitzenmacher. 2004. A brief history of generative models for power law
+  [4] Leman Akoglu, Mary McGlohon, and Christos Faloutsos. 2008. RTM: Laws and a              and lognormal distributions. Internet Mathematics 1, 2 (2004), 226–251.
+      recursive generator for weighted time-evolving graphs. In ICDM.                   [40]  Mark EJ Newman. 2001. Clustering and preferential attachment in growing
+  [5] Leman Akoglu, Mary McGlohon, and Christos Faloutsos. 2010. Oddball: Spotting            networks. Physical review E 64, 2 (2001), 025102.
+      anomalies in weighted graphs. In PAKDD.                                           [41]  Ashwin Paranjape, Austin R Benson, and Jure Leskovec. 2017. Motifs in temporal
+  [6] Réka Albert, Hawoong Jeong, and Albert-László Barabási. 1999. Internet: Diame-          networks. In WSDM.
+      ter of the world-wide web. Nature 401, 6749 (1999), 130.                          [42]  Alessandra Sala, Lili Cao, Christo Wilson, Robert Zablit, Haitao Zheng, and
+  [7] Réka Albert, Hawoong Jeong, and Albert-László Barabási. 2002. Statistical me-           Ben Y Zhao. 2010. Measurement-calibrated graph models for social network
+      chanics of complex networks. Rev. Mod. Phys (2002).                                     experiments. In WWW.
+  [8] Jeff Alstott  and Dietmar    Plenz Bullmore. 2014. powerlaw: a Python package for [43]  Kijung Shin. 2017. Wrs: Waiting room sampling for accurate triangle counting
+      analysis of heavy-tailed distributions. PloS one 9, 1 (2014).                           in real graph streams. In ICDM.
+  [9] Albert-László Barabási and Réka Albert. 1999. Emergence of scaling in random      [44]  Kijung Shin, Tina Eliassi-Rad, and Christos Faloutsos. 2018. Patterns and anom-
+      networks. Science 286, 5439 (1999), 509–512.                                            alies in k-cores of real-world graphs with applications. Knowl. Inf. Syst 54, 3
+[10]  Austin R Benson, Rediet Abebe, Michael T Schaub, Ali Jadbabaie, and Jon Klein-          (2018), 677–710.
+      berg. 2018. Simplicial closure and higher-order link prediction. Proc. Natl. Acad. [45] Arnab Sinha, Zhihong Shen, Yang Song, Hao Ma, Darrin Eide, Bo-June (Paul)
+      Sci. U.S.A 115, 48 (2018), E11221–E11230.                                               Hsu, and Kuansan Wang. 2015. An Overview of Microsoft Academic Service
+[11]  Austin R Benson, David F Gleich, and Jure Leskovec. 2016. Higher-order organi-          (MAS) and Applications. In WWW.
+      zation of complex networks. Science 353, 6295 (2016), 163–166.                    [46]  Despina Stasi, Kayvan Sadeghi, Alessandro Rinaldo, Sonja Petrović, and Stephen E
+[12]  Austin R Benson, Ravi Kumar, and Andrew Tomkins. 2018. Sequences of sets. In            Fienberg. 2014. β models for random hypergraphs with a given degree sequence.
+      KDD.                                                                                    arXiv preprint arXiv:1407.1004 (2014).
+[13]  Béla Bollobás and Oliver Riordan. 2004. The diameter of a scale-free random       [47]  Alexei Vázquez. 2003. Growing network with local rules: Preferential attachment,
+      graph. Combinatorica 24, 1 (2004), 5–34.                                                clustering hierarchy, and degree correlations. Physical Review E 67, 5 (2003),
+[14]  Phillip Bonacich, Annie Cody Holdren, and Michael Johnston. 2004. Hyper-edges           056104.
+      and multi-dimensional centrality. Soc. Netw 26, 3 (2004), 189–203.                [48]  Duncan J Watts and Steven H Strogatz. 1998. Collective dynamics of ‘small-
+[15]  Andrei Broder, Ravi Kumar, Farzin Maghoul, Prabhakar Raghavan, Sridhar Ra-              world’networks. Nature 393, 6684 (1998), 440.
+      jagopalan, Raymie Stata, Andrew Tomkins, and Janet Wiener. 2000. Graph            [49]  Ye Xu, Dan Rockmore, and Adam M Kleinbaum. 2013. Hyperlink prediction in
+      structure in the web. Computer networks 33, 1-6 (2000), 309–320.                        hypernetworks using latent social features. In DS.
+[16] Berge C. 2013. Hypergraphs. Vol. 45. North Holland, Amsterdam.                     [50]  Hao Yin, Austin R Benson, Jure Leskovec, and David F Gleich. 2017. Local
+[17]  Philip S Chodrow. 2019. Configuration     Models of Random Hypergraphs and              higher-order graph clustering. In KDD.
+      their Applications. arXiv preprint arXiv:1902.09302 (2019).                       [51]  Se-eun Yoon, Hyungseok Song, Kijung Shin, and Yung Yi. 2020. How Much and
+[18]  Fan Chung and Linyuan Lu. 2002. The average distances in random graphs with             When Do We Need Higher-order Information in Hypergraphs? A Case Study on
+      given expected degrees. Proc. Natl. Acad. Sci. U.S.A 99, 25 (2002), 15879–15882.        Hyperedge Prediction. In WWW.
+[19]  Aaron Clauset, Cosma Rohilla Shalizi, and Mark EJ Newman. 2009. Power-law         [52]  Dengyong Zhou, Jiayuan Huang, and Bernhard Scholkopf. 2006. Learning with
+      distributions in empirical data. SIAM review 51, 4 (2009), 661–703.                     Hypergraphs: Clustering, Classification, and   Embedding. In NIPS.
+KDD ’20, August 23–27, 2020, Virtual Event, USA                                                                    Do et al.
+
+
+A    APPENDIX: DATASET DESCRIPTION                                    1.0
+The thirteen datasets investigated in our work are from the follow-
+
+ing sources:                                                          0.8
+                                                                                                       coauth-DBLP
+• Publication coauthors: each node is an author and each hy-                                           coauth-Geology
+  peredge is a publication involving one or several coauthors. The    0.6                              coauth-History
+                                                                                                       DAWN
+  coauthorship hypergraphs considered in this paper are coauth-                                        email-Eu
+        5                                                                                              NDC-classes
+  DBLP   , coauth-Geology [45], coauth-History [49].                  0.4
+                                                                                                       NDC-substances
+• Drug abuse warning network (DAWN) drugs: each node is a                                              tags-ask-ubuntu
+                                                                                                       tags-math
+  drug and each hyperedge is a set of drugs used by a patient.        0.2                              tags-stack-overflow
+  Emails from an European research institution (         ):                                            threads-ask-ubuntu
+•                                               email-Eu                                               threads-math
+                                                                                                       threads-stack-overflow
+  each node is an email address and each hyperedge is a set of       Proportion  of hyperedges 0.0
+
+  sender and all recipients of an email [50].                           0        5      10       15      20      25
+• National drug code directory (NDC) drugs: each node is a                            Hyperedge size
+  class label (in NDC-classes) or a substance (in NDC-substances) Figure 5: Cumulative distribution of hyperedge sizes.
+  and each hyperedge is the set of labels/substances of a drug.
+• Online question tags: each node is a tag and each hyperedge
+  is the set of tags attached to a question in an online forum. We
+  considered tags-ask-ubuntu6, tags-math7, tags-stack-overflow8.
+• Thread participants: each node is a user registered in an online
+  forum and each hyperedge is the set of users participating in a Algorithm 2: NaivePA (Baseline Model)
+  discussion thread. There are 3 considered datasets: threads-ask- Inputs :(1) distribution of hyperedge sizes S (with max size s¯),
+  ubuntu, threads-math, threads-stack-overflow.                          (2) distribution of number of new hyperedges N P,
+We thank the authors of [10] for making the datasets publicly avail-     (3) number of nodes n
+                                                                  Output:synthetic hypergraph
+able for our research purposes. From the raw format, we preprocess                        G
+                                                                1 initialize G with ⌊s¯/2⌋ disjoint hyperedges of size 2, and compute the
+each hypergraph to retain only unique hyperedges since duplicated  degree of all nodes in them
+hyperedges do not contribute to the above patterns. The distribu-
+                                                                2 for i ← 1 to n do
+tion of hyperedge sizes are ploted in Fig. 5. For the decomposed 3   sample a number k from N P.
+graphs of the datasets, the numbers of nodes are reported in Tables 2 4 for j ← 1 to k do
+and 4, and the numbers of edges are listed in Table 7.          5       sample a hyperedge size s from S
+                                                                6       if s = 1 then
+   Table 7: Number of edges in the decomposed graphs.           7          add the hyperedge {i } to G
+                                                                8       else
+  Dataset              |  |      |  |     |   |     |  |
+                        E(1)     E(2)      E(3)      E(4)       9          choose (s − 1) nodes independently with probability
+  coauth-DBLP         7,904,336 31,284,160 50,887,503 35,299,764             proportional to their degrees
+  coauth-Geology      5,120,762 18,987,747 35,384,178 26,839,940 10        add the hyperedge of i and the s − 1 nodes to G
+  coauth-History      1,156,914 1,852,269 3,001,774 2,183,900
+  DAWN                122,963  1,682,274 4,097,770 3,219,360   11    for each node involved the k newly formed hyperedges with i do
+  email-Eu             29,299   155,769   393,527  360,955     12       increase the degree of each node by the number of its
+  NDC-classes          6,222    20,568    45,793    38,525               involving hyperedges
+  NDC-substances       88,268   116,967   268,057  231,445
+  tags-ask-ubuntu     132,703  1,275,135 1,256,181 254,750
+  tags-math            91,685  1,217,031 1,375,434 292,440     B.2   Pseudocode for Subset Sampling
+  tags-stack-overflow 4,147,302 57,815,235 71,817,873 16,327,590 We present the pseudocode for Subset Sampling in Algorithm 3.
+  threads-ask-ubuntu  187,157   227,547   175,627   85,665     For Subset Sampling, in order to keep the model simple, we tried
+  threads-math        1,089,307 2,810,934 3,086,411 1,770,730  the following variants for the sampling rule P:
+  threads-stack-overflow 20,999,838 52,797,462 66,240,865 41,329,315
+                                                               • random: a hyperedge is randomly chosen among all previously
+                                                                 formed hyperedges.
+                                                               • recent: among all available hyperedges E1, E2, ..., En, hyperedge
+B    APPENDIX: PSEUDOCODE                                                                                i
+                                                                 Ei has probability of being chosen equal to Ín .
+B.1    Pseudocode for NaivePA                                                                            j=1 j
+                                                               • k most recent: only sample a set based on random or recent from
+Pseudocode for NaivePA is provided in Algorithm 2. Unlike Hy-
+                                                                 the k most recent hyperedges.
+perPA, which maintains the degree of every subset of every hy-
+                                                               Empirical data shows that when P is k most recent, the resulting
+peredge, NaivePA only maintains the degree of individual nodes. graph has an unrealistically high diameter, while none between
+When forming hyperedges with each newly arrived node, NaivePA
+                                                               random and recent outperforms the other. For probability p, increas-
+chooses several nodes independently based on their degrees.    ing from 0 4 does not significantly change the result, while too low
+5https://dblp.org/xml/release/                                          .
+6https://askubuntu.com/                                        values make the graph shattered at the triangle-level decomposi-
+7https://math.stackexchange.com/                               tion. The reported results of Subset Sampling are from p = 0.8 and
+8
+ https://stackoverflow.com/                                    P = random.
+Structural Patterns and Generative Models of Real-world Hypergraphs KDD ’20, August 23–27, 2020, Virtual Event,USA
+
+ Algorithm 3: Subset Sampling (Baseline Model)                 e of sizem. We add this hyperedge e into S and decrement the weight
+                                                               of each edge involved in the resulting clique of in the 1 -level
+   Inputs :(1) distribution of hyperedge sizes S,                                                      e      (m − )
+          (2) distribution of number of new hyperedges N P,    decomposed graph. We keep doing this until we completely clear
+          (3) number of nodes n,                               the graph (i.e., making the weights of all edges to 0) to recover all
+          (4) sampling rule P,                                 hyperedges of size m.
+          (5) probability p                                       Assume that we have recovered all hyperedges of sizes greater
+   Output:synthetic hypergraph G                               than k and have stored them in S. In the (k − 1)-level decomposed
+ 1 initialize G with 2 disjoint hyperedges of maximum size in S graph, we decrement the weight of each edge involved in the clique
+ 2 for   1 to do
+      i ←    n                                                 resulting from each hyperedge currently in S. Then, we repeat the
+      sample a number from
+ 3                  k     N P                                  process above to recover all hyperedges of size k.
+ 4    for j ← 1 to k do                                           By continuing this procedure, eventually we can also recover
+         sample a size s from
+ 5                       S                                     all hyperedges of sizes at least 2 after processing the node-level
+ 6       if  = 1 then
+           s                                                   decomposed graph (i.e., 1-level decomposed graph). Since we also
+             add the hyperedge to
+ 7                          {i } G                             maintain self-loops, we can recover all hyperedges of size 1. The
+ 8       else
+                                                               proof is completed here.                                □
+ 9           initialize B to {i }
+10           while |B | < s do
+11              initialize T to an empty set                   C.2    Randomness in     HyperPA
+12              sample a hyperedge E of G based on P           We present a simple proof about the randomness in HyperPA.
+13              sample each node v ∈ E into B with prob. p        Theorem 2. (Randomness in HyperPA). Given that the largest
+14              if |T | ≤ s − |B | then
+                                                               size s possible in the distribution S is a finite number s¯, the conditional
+15                 B ← B ∪ T
+                                                               statement at line 8 of Algorithm 1, denoted as statement U, holds at
+16              else
+                                                               most  s¯ − 1 times.
+17                 T ← randomly chosen s − |B | nodes in T           2
+18                 B ← B ∪ T                                      Proof. Assume that at a given time step t, the sampled size at
+                                                               line 5 is s and U holds. Then, the following conditions must be
+19           add the hyperedge B to G
+                                                               satisfied:
+                                                                  (1) All (s − 1)-sized groups have 0 degree, i.e., up to the time
+C    APPENDIX: PROOFS                                                step t, only hyperedges of sizes up to s − 2 present in the
+C.1    Recovering hypergraphs from decomposed                        hypergraph,
+       graphs                                                     (2) s ≥ 4,
+In this section, we prove that the original hypergraph can be recov- where the second condition is from the first condition and the
+ered exactly from its decomposed graphs. To this end, we consider fact that the hypergraph is initialized with 12 hyperedges of size
+decomposed graphs with self-loops and edge weights, which are  2. Denote two consecutive time steps when U holds as t and t ′,
+ignored in the previous sections since they do not contribute to respectively. Denote the hyperedge sizes sampled at line 5 at time
+                                                               steps and  ′ as and ′, respectively. According to the above two
+the presented patterns. Specifically, for each k-level decomposed   t    t   s     s
+graph     =           of a hypergraph =      , we introduce    conditions, s ≥ 4 and s ≤ s′ − 2. Assume U holds M times at time
+      G(k)  (V(k), E(k))            G   (V , E)
+a weight function   , defined as follows:                      steps t1, .., t , and denote the hyperedge sizes sampled at line 5 of
+                ω(k)                                                     M
+                                                               the algorithm at these time steps as s1, ...,s , respectively. Then,
+                        :=      :                                                                   M
+        ω(k) {u(k),v(k)}   |{e ∈ E u(k) ∪ v(k) ⊆ e}|.          as shown,
+That is, for each edge {    } in   ,    gives the number of
+                    u(k),v(k)   E(k) ω(k)                               s1 ≤ s2 − 2 ≤ s3 − 4 ≤ ... ≤ sM − 2 × (M − 1).
+hyperedges in that contain the union of and   . Additionally,
+             E                     u(k)   v(k)                 Then, 2        1           . This,    4, and       ¯ imply
+for each hyperedge      of size 1, we add a self-loop to the node      × (M −  ) ≤ sM − s1      s1 ≥        sM ≤  s
+                 {a} ∈ E                                       2        1   ¯  4 or equivalently    s¯ 1. As   must be an
+    in the 1-level decomposed graph.                             × (M −  ) ≤ s −               M ≤  2 −     M
+{a}                                                                                        s¯  
+                                                               integer, we conclude that M ≤ 2 − 1 .                   □
+   Theorem 1. (Recovery of original hypergraphs). Assume that
+the maximum size of a hyperedge in a given hypergraph is . If we  As in our datasets, the maximum hyperedge size is 25 and the
+                                                   m           distribution used for HyperPA is learned from the dataset, we
+have all the decomposed graphs up to level ( − 1) with edge weights       S
+                                     m                              ¯
+and self-loops, we can recover the original hypergraph.        have s = 25 for HyperPA. According to the proof, the conditional
+                                                               statement at line 8 of Algorithm 1 can only hold at most 11 times.
+   Proof. Initialize an empty set S = ∅, which will contain the If the number of nodes n is relatively large, most of the time when
+recovered hyperedges. We recover the hyperedges sized from the s > 1, the conditional statement at line 8 in Algorithm 1 does not
+largest to smallest. By our definition, a hyperedge of size n > k hold, indicating that lines 12-13 of the pseudocode are executed.
+results in a clique of size  n in the -level decomposed graph.
+                       k       k
+   We start with the (m − 1)-level decomposed graph: for each
+edge between two distinct (m − 1)-level nodes {a1, ..., am−1} and
+{b1, ...,bm−1}, as m is the maximum size for any hyperedge, the
+union of these two (m−1)-level nodes must be an original hyperedge
